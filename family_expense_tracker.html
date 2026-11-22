@@ -1,0 +1,1532 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full bg-slate-50">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Family Expense Tracker - Jharkhand & Mumbai Admin</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Font Awesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Google Fonts Inter -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- Firebase SDK (Compat version for single file ease) -->
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+    
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: { sans: ['Inter', 'sans-serif'] },
+                    colors: {
+                        brand: { 50: '#f0fdf4', 100: '#dcfce7', 500: '#22c55e', 600: '#16a34a', 700: '#15803d' }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        /* Custom Scrollbar & Utility Animations */
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: #f1f5f9; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 9999px; }
+        ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+        .glass-header { backdrop-filter: blur(8px); background-color: rgba(255, 255, 255, 0.85); }
+        .badge-color-emerald { background-color: #d1fae5; color: #065f46; border-color: #a7f3d0; }
+        .badge-color-sky { background-color: #e0f2fe; color: #075985; border-color: #bae6fd; }
+        .badge-color-lime { background-color: #ecfccb; color: #3f6212; border-color: #d9f99d; }
+        .badge-color-orange { background-color: #ffedd5; color: #9a3412; border-color: #fed7aa; }
+        .badge-color-amber { background-color: #fef3c7; color: #92400e; border-color: #fde68a; }
+        .badge-color-rose { background-color: #ffe4e6; color: #9f1239; border-color: #fecdd3; }
+        .badge-color-violet { background-color: #ede9fe; color: #5b21b6; border-color: #ddd6fe; }
+        .badge-color-indigo { background-color: #e0e7ff; color: #3730a3; border-color: #c7d2fe; }
+        .badge-color-slate { background-color: #f1f5f9; color: #334155; border-color: #e2e8f0; }
+        
+        @media print {
+            .no-print { display: none !important; }
+            .print-only { display: block !important; }
+            body { background: white; color: black; }
+        }
+    </style>
+</head>
+<body class="h-full text-slate-800 flex flex-col antialiased selection:bg-brand-500 selection:text-white">
+
+    <!-- Top Navigation Header -->
+    <header class="sticky top-0 z-30 glass-header border-b border-slate-200 shadow-sm">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex items-center justify-between h-16">
+                <!-- App Title -->
+                <div class="flex items-center space-x-3">
+                    <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-emerald-600 to-teal-500 flex items-center justify-center text-white shadow-md shadow-emerald-200">
+                        <i class="fa-solid fa-wallet text-lg"></i>
+                    </div>
+                    <div>
+                        <h1 class="text-lg font-bold text-slate-900 leading-tight">Family Expense Tracker</h1>
+                        <p class="text-xs text-slate-500 flex items-center gap-1.5">
+                            <span id="syncStatus" class="inline-block w-2 h-2 rounded-full bg-amber-400"></span>
+                            <span id="syncStatusText">Connecting Firestore...</span>
+                        </p>
+                    </div>
+                </div>
+
+                <!-- Admin Status Toggle Button & Info -->
+                <div class="flex items-center space-x-3">
+                    <div id="modeBadge" class="hidden sm:flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-800 border border-emerald-200">
+                        <i class="fa-solid fa-house-user mr-1.5"></i> Jharkhand Mode
+                    </div>
+
+                    <button id="adminToggleBtn" onclick="toggleAdminAuthModal()" class="flex items-center px-3.5 py-1.5 rounded-lg text-xs font-medium bg-slate-800 text-white hover:bg-slate-700 transition shadow-sm">
+                        <i id="adminLockIcon" class="fa-solid fa-lock mr-1.5 text-amber-400"></i>
+                        <span id="adminBtnText">Unlock Admin (Mumbai)</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Secondary Stats Bar -->
+        <div class="bg-slate-900 text-slate-100 px-4 py-2 text-xs border-t border-slate-800">
+            <div class="max-w-7xl mx-auto flex flex-wrap justify-between items-center gap-2">
+                <div class="flex items-center space-x-4">
+                    <span><i class="fa-solid fa-clock text-amber-400 mr-1"></i> Pending Admin Pay: <strong id="topPendingTotal" class="text-amber-300">₹0</strong></span>
+                    <span><i class="fa-solid fa-circle-check text-emerald-400 mr-1"></i> Month Settled: <strong id="topPaidTotal" class="text-emerald-300">₹0</strong></span>
+                </div>
+                <div class="flex items-center space-x-2">
+                    <button onclick="openExportModal()" class="text-xs bg-slate-800 hover:bg-slate-700 text-slate-200 px-2.5 py-1 rounded border border-slate-700 transition flex items-center gap-1">
+                        <i class="fa-solid fa-file-export text-teal-400"></i> Reports & Statements
+                    </button>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content Container -->
+    <main class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+
+        <!-- Navigation Tabs -->
+        <div class="border-b border-slate-200 bg-white rounded-xl shadow-sm p-1.5 flex flex-wrap gap-1">
+            <button onclick="switchTab('addExpense')" id="tab-addExpense" class="tab-btn flex-1 min-w-[130px] py-2.5 px-3 rounded-lg text-xs font-semibold text-center transition flex items-center justify-center gap-1.5 bg-emerald-600 text-white shadow-sm">
+                <i class="fa-solid fa-plus-circle"></i> Add Expense
+            </button>
+            <button onclick="switchTab('history')" id="tab-history" class="tab-btn flex-1 min-w-[130px] py-2.5 px-3 rounded-lg text-xs font-semibold text-center transition flex items-center justify-center gap-1.5 text-slate-600 hover:bg-slate-100">
+                <i class="fa-solid fa-list-check"></i> Expense History
+            </button>
+            <button onclick="switchTab('adminSettlement')" id="tab-adminSettlement" class="tab-btn flex-1 min-w-[130px] py-2.5 px-3 rounded-lg text-xs font-semibold text-center transition flex items-center justify-center gap-1.5 text-slate-600 hover:bg-slate-100 relative">
+                <i class="fa-solid fa-building-columns"></i> Admin Settlement
+                <span id="pendingBadgeCount" class="hidden bg-rose-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full">0</span>
+            </button>
+            <button onclick="switchTab('creditCards')" id="tab-creditCards" class="tab-btn flex-1 min-w-[130px] py-2.5 px-3 rounded-lg text-xs font-semibold text-center transition flex items-center justify-center gap-1.5 text-slate-600 hover:bg-slate-100">
+                <i class="fa-solid fa-credit-card"></i> Credit Cards
+            </button>
+            <button onclick="switchTab('analytics')" id="tab-analytics" class="tab-btn flex-1 min-w-[130px] py-2.5 px-3 rounded-lg text-xs font-semibold text-center transition flex items-center justify-center gap-1.5 text-slate-600 hover:bg-slate-100">
+                <i class="fa-solid fa-chart-pie"></i> Analytics
+            </button>
+        </div>
+
+        <!-- ================= TAB 1: ADD EXPENSE ================= -->
+        <section id="sec-addExpense" class="tab-content block">
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <!-- Form Card -->
+                <div class="lg:col-span-2 bg-white rounded-2xl shadow-sm border border-slate-200 p-5 sm:p-6">
+                    <div class="flex justify-between items-center mb-5 pb-3 border-b border-slate-100">
+                        <div>
+                            <h2 class="text-base font-bold text-slate-900">Add New Family Expense</h2>
+                            <p class="text-xs text-slate-500">Record an expense locally paid in Jharkhand or request Admin (Mumbai) payment.</p>
+                        </div>
+                        <span class="px-2.5 py-1 text-[11px] font-semibold bg-emerald-50 text-emerald-700 rounded-full border border-emerald-200">
+                            Jharkhand Entry Form
+                        </span>
+                    </div>
+
+                    <form id="expenseForm" onsubmit="handleSaveExpense(event)" class="space-y-4">
+                        <!-- Expense Title & Amount -->
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            <div>
+                                <label class="block text-xs font-medium text-slate-700 mb-1">Expense Title / Item *</label>
+                                <input type="text" id="expTitle" required placeholder="e.g. Monthly Grocery, Electricity Bill" class="w-full px-3.5 py-2 text-sm rounded-lg border border-slate-300 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-medium text-slate-700 mb-1">Amount (₹) *</label>
+                                <div class="relative">
+                                    <span class="absolute inset-y-0 left-0 pl-3 flex items-center text-slate-400 font-semibold text-sm">₹</span>
+                                    <input type="number" id="expAmount" step="0.01" min="1" required placeholder="0.00" class="w-full pl-8 pr-3.5 py-2 text-sm rounded-lg border border-slate-300 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none font-semibold text-slate-900 transition">
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Category & Date -->
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            <div>
+                                <label class="block text-xs font-medium text-slate-700 mb-1">Category *</label>
+                                <select id="expCategory" required class="w-full px-3.5 py-2 text-sm rounded-lg border border-slate-300 focus:ring-2 focus:ring-emerald-500 outline-none transition">
+                                    <!-- Dynamic Options from Admin Settings -->
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-xs font-medium text-slate-700 mb-1">Date *</label>
+                                <input type="date" id="expDate" required class="w-full px-3.5 py-2 text-sm rounded-lg border border-slate-300 focus:ring-2 focus:ring-emerald-500 outline-none transition">
+                            </div>
+                        </div>
+
+                        <!-- Payment Status Toggle & Member Selector -->
+                        <div class="p-4 bg-slate-50 rounded-xl border border-slate-200 space-y-4">
+                            <div>
+                                <label class="block text-xs font-semibold text-slate-700 mb-2">Payment Status *</label>
+                                <div class="grid grid-cols-2 gap-3">
+                                    <label id="lblStatusPaid" class="flex items-center justify-center p-3 rounded-lg border border-slate-300 bg-white cursor-pointer hover:border-emerald-400 transition text-xs font-medium text-slate-700">
+                                        <input type="radio" name="paymentStatus" value="paid" onchange="handlePaymentStatusChange('paid')" class="sr-only">
+                                        <i class="fa-solid fa-circle-check text-emerald-500 mr-2 text-sm"></i> Already Paid Locally
+                                    </label>
+                                    <label id="lblStatusPending" class="flex items-center justify-center p-3 rounded-lg border-2 border-amber-500 bg-amber-50 cursor-pointer transition text-xs font-semibold text-amber-900">
+                                        <input type="radio" name="paymentStatus" value="pending" checked onchange="handlePaymentStatusChange('pending')" class="sr-only">
+                                        <i class="fa-solid fa-clock text-amber-500 mr-2 text-sm"></i> Need Admin (Mumbai) to Pay
+                                    </label>
+                                </div>
+                            </div>
+
+                            <!-- Dynamic Family Member Selector -->
+                            <div id="memberSelectorWrapper" class="p-3 rounded-lg bg-amber-100/60 border border-amber-200 transition-all">
+                                <label id="memberSelectLabel" class="block text-xs font-bold text-amber-900 mb-1.5">
+                                    Entered By (Family Member) *
+                                </label>
+                                <select id="expPaidBy" required class="w-full px-3.5 py-2 text-sm rounded-lg border border-amber-300 bg-white focus:ring-2 focus:ring-amber-500 outline-none font-medium text-slate-800 transition">
+                                    <!-- Populated dynamically from family_settings -->
+                                </select>
+                            </div>
+                        </div>
+
+                        <!-- Shopkeeper UPI & QR Code Attachment (Optional) -->
+                        <div class="border border-dashed border-slate-300 rounded-xl p-4 bg-slate-50/50 space-y-3">
+                            <div class="flex justify-between items-center">
+                                <label class="text-xs font-semibold text-slate-700 flex items-center gap-1.5">
+                                    <i class="fa-solid fa-qrcode text-indigo-600"></i> Shopkeeper UPI QR Code / UPI ID (Optional)
+                                </label>
+                                <span class="text-[10px] text-slate-400">Compressed Canvas Upload</span>
+                            </div>
+
+                            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                <div>
+                                    <input type="text" id="expUpiId" placeholder="e.g. shopkeeper@upi or 9876543210@paytm" class="w-full px-3 py-1.5 text-xs rounded-lg border border-slate-300 focus:ring-1 focus:ring-indigo-500 outline-none">
+                                </div>
+                                <div>
+                                    <input type="file" id="expQrFile" accept="image/*" onchange="handleQrFileUpload(event)" class="w-full text-xs text-slate-500 file:mr-3 file:py-1.5 file:px-3 file:rounded-md file:border-0 file:text-xs file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100">
+                                </div>
+                            </div>
+
+                            <!-- Image Preview & Canvas hidden compression -->
+                            <div id="qrPreviewBox" class="hidden flex items-center gap-3 pt-2">
+                                <img id="qrPreviewImg" src="" alt="QR Code Preview" class="w-20 h-20 object-cover rounded-lg border border-slate-300 shadow-sm">
+                                <div>
+                                    <p class="text-xs font-semibold text-emerald-700"><i class="fa-solid fa-circle-check"></i> QR Code Attached & Compressed</p>
+                                    <button type="button" onclick="removeQrImage()" class="text-xs text-rose-600 hover:underline mt-1">Remove QR Code</button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Notes Field -->
+                        <div>
+                            <label class="block text-xs font-medium text-slate-700 mb-1">Notes / Description (Optional)</label>
+                            <textarea id="expNotes" rows="2" placeholder="Add additional details like shop name or reason..." class="w-full px-3.5 py-2 text-sm rounded-lg border border-slate-300 focus:ring-2 focus:ring-emerald-500 outline-none transition"></textarea>
+                        </div>
+
+                        <!-- Submit Button -->
+                        <button type="submit" id="saveExpenseBtn" class="w-full py-3 px-4 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold rounded-xl shadow-md shadow-emerald-200 transition flex items-center justify-center gap-2">
+                            <i class="fa-solid fa-paper-plane"></i> Save Expense Item
+                        </button>
+                    </form>
+                </div>
+
+                <!-- Right Side Quick Overview Panel -->
+                <div class="space-y-4">
+                    <div class="bg-gradient-to-br from-slate-900 to-slate-800 text-white rounded-2xl p-5 shadow-sm space-y-4">
+                        <div class="flex items-center justify-between border-b border-slate-700/60 pb-3">
+                            <h3 class="text-sm font-bold flex items-center gap-2">
+                                <i class="fa-solid fa-bolt text-amber-400"></i> Active Month Quick Stats
+                            </h3>
+                            <span id="currentMonthYearLabel" class="text-xs text-slate-300 font-medium"></span>
+                        </div>
+                        <div class="space-y-3">
+                            <div class="flex justify-between items-center text-xs">
+                                <span class="text-slate-300">Total Month Expenses:</span>
+                                <span id="statMonthTotal" class="font-bold text-sm text-white">₹0</span>
+                            </div>
+                            <div class="flex justify-between items-center text-xs">
+                                <span class="text-slate-300">Pending Admin Pay:</span>
+                                <span id="statMonthPending" class="font-bold text-sm text-amber-400">₹0</span>
+                            </div>
+                            <div class="flex justify-between items-center text-xs">
+                                <span class="text-slate-300">Settled / Paid:</span>
+                                <span id="statMonthPaid" class="font-bold text-sm text-emerald-400">₹0</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Quick WhatsApp Share Card -->
+                    <div class="bg-emerald-50 border border-emerald-200 rounded-2xl p-4 space-y-2">
+                        <div class="flex items-center gap-2 text-emerald-900 font-bold text-xs">
+                            <i class="fa-brands fa-whatsapp text-emerald-600 text-base"></i> Share Expense Summary
+                        </div>
+                        <p class="text-xs text-emerald-800">Instantly generate and copy a WhatsApp formatted breakdown of pending expenses for Admin.</p>
+                        <button onclick="shareWhatsAppSummary()" class="w-full mt-2 py-2 px-3 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold rounded-lg transition flex items-center justify-center gap-1.5 shadow-sm">
+                            <i class="fa-solid fa-share-nodes"></i> Copy WhatsApp Summary Text
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ================= TAB 2: EXPENSE HISTORY & FILTERS ================= -->
+        <section id="sec-history" class="tab-content hidden space-y-4">
+            <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-4 sm:p-5">
+                <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-4 pb-4 border-b border-slate-100">
+                    <div>
+                        <h2 class="text-base font-bold text-slate-900">Expense History</h2>
+                        <p class="text-xs text-slate-500">Filter, search, and view all recorded family transactions.</p>
+                    </div>
+                    
+                    <!-- Filters Row -->
+                    <div class="flex flex-wrap items-center gap-2 w-full md:w-auto">
+                        <!-- Member Filter -->
+                        <select id="filterMember" onchange="renderExpenseHistory()" class="px-3 py-1.5 text-xs rounded-lg border border-slate-300 bg-white font-medium text-slate-700">
+                            <option value="ALL">All Family Members</option>
+                        </select>
+
+                        <!-- Status Filter -->
+                        <select id="filterStatus" onchange="renderExpenseHistory()" class="px-3 py-1.5 text-xs rounded-lg border border-slate-300 bg-white font-medium text-slate-700">
+                            <option value="ALL">All Statuses</option>
+                            <option value="pending">Pending Admin Pay</option>
+                            <option value="paid">Already Paid / Settled</option>
+                        </select>
+
+                        <!-- Month & Year Filter -->
+                        <input type="month" id="filterMonth" onchange="renderExpenseHistory()" class="px-3 py-1.5 text-xs rounded-lg border border-slate-300 bg-white font-medium text-slate-700">
+
+                        <button onclick="resetFilters()" class="px-3 py-1.5 text-xs rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-600 font-medium transition">
+                            Reset
+                        </button>
+                    </div>
+                </div>
+
+                <!-- History Table / Cards -->
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left text-xs text-slate-600">
+                        <thead class="bg-slate-50 text-slate-700 uppercase text-[10px] font-bold border-y border-slate-200">
+                            <tr>
+                                <th class="py-3 px-3">Date</th>
+                                <th class="py-3 px-3">Category</th>
+                                <th class="py-3 px-3">Title & Details</th>
+                                <th class="py-3 px-3">Member / Paid By</th>
+                                <th class="py-3 px-3 text-right">Amount</th>
+                                <th class="py-3 px-3 text-center">Status</th>
+                                <th class="py-3 px-3 text-center">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="historyTableBody" class="divide-y divide-slate-100">
+                            <!-- Populated via JavaScript -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+        <!-- ================= TAB 3: ADMIN SETTLEMENT & ADMIN SETTINGS ================= -->
+        <section id="sec-adminSettlement" class="tab-content hidden space-y-6">
+
+            <!-- Locked State View -->
+            <div id="adminLockedNotice" class="bg-white rounded-2xl shadow-sm border border-slate-200 p-8 text-center max-w-md mx-auto my-8 space-y-4">
+                <div class="w-14 h-14 bg-amber-100 text-amber-600 rounded-full flex items-center justify-center mx-auto text-2xl shadow-inner">
+                    <i class="fa-solid fa-lock"></i>
+                </div>
+                <h3 class="text-base font-bold text-slate-900">Admin Mode Required (Mumbai)</h3>
+                <p class="text-xs text-slate-500">Please unlock Mumbai Admin Mode using your 4-digit PIN to process payments, settle expenses, and edit settings.</p>
+                <button onclick="openAdminPinModal()" class="py-2.5 px-5 bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold rounded-xl transition shadow-sm">
+                    <i class="fa-solid fa-key mr-1"></i> Enter Admin PIN (1234)
+                </button>
+            </div>
+
+            <!-- Unlocked Admin View Content -->
+            <div id="adminUnlockedView" class="hidden space-y-6">
+
+                <!-- 1. Pending Approvals & QR Scan-to-Pay Panel -->
+                <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-5 sm:p-6">
+                    <div class="flex justify-between items-center mb-4 pb-3 border-b border-slate-100">
+                        <div>
+                            <h2 class="text-base font-bold text-slate-900">Pending Admin Payments & QR Pay</h2>
+                            <p class="text-xs text-slate-500">Scan shopkeeper UPI QR codes to pay from Mumbai and mark items settled.</p>
+                        </div>
+                        <span id="pendingItemsBadge" class="px-3 py-1 bg-amber-100 text-amber-800 font-bold text-xs rounded-full border border-amber-200">
+                            0 Items Pending
+                        </span>
+                    </div>
+
+                    <!-- Pending Items Grid -->
+                    <div id="pendingAdminList" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                        <!-- Dynamic Pending Items -->
+                    </div>
+                </div>
+
+                <!-- 2. Admin Settings: Family Members & Categories Card -->
+                <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-5 sm:p-6 space-y-5">
+                    <div class="pb-3 border-b border-slate-100 flex items-center justify-between">
+                        <div>
+                            <h2 class="text-base font-bold text-slate-900 flex items-center gap-2">
+                                <i class="fa-solid fa-sliders text-emerald-600"></i> Admin Settings: Family Members & Categories
+                            </h2>
+                            <p class="text-xs text-slate-500">Real-time synchronized across all devices in Firestore collection <code class="bg-slate-100 px-1 rounded text-slate-700">family_settings/config</code>.</p>
+                        </div>
+                        <span class="text-xs font-semibold text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-full border border-emerald-200">
+                            <i class="fa-solid fa-cloud-arrow-up mr-1"></i> Sync Active
+                        </span>
+                    </div>
+
+                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                        
+                        <!-- Panel A: Manage Family Members -->
+                        <div class="p-4 rounded-xl bg-slate-50 border border-slate-200 space-y-4">
+                            <h3 class="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
+                                <i class="fa-solid fa-users text-sky-600"></i> Manage Family Members
+                            </h3>
+                            
+                            <form onsubmit="handleAddMember(event)" class="flex gap-2">
+                                <input type="text" id="newMemberInput" required placeholder="Enter name (e.g. Didi)" class="flex-1 px-3 py-2 text-xs rounded-lg border border-slate-300 focus:ring-2 focus:ring-sky-500 outline-none">
+                                <button type="submit" class="px-3.5 py-2 bg-sky-600 hover:bg-sky-700 text-white text-xs font-semibold rounded-lg transition">
+                                    + Add Member
+                                </button>
+                            </form>
+
+                            <!-- Members List Tags -->
+                            <div>
+                                <label class="block text-[11px] font-medium text-slate-500 mb-2">Current Members:</label>
+                                <div id="membersPillList" class="flex flex-wrap gap-2">
+                                    <!-- Dynamic Members Pills -->
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Panel B: Manage Expense Categories -->
+                        <div class="p-4 rounded-xl bg-slate-50 border border-slate-200 space-y-4">
+                            <h3 class="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
+                                <i class="fa-solid fa-tags text-emerald-600"></i> Manage Expense Categories
+                            </h3>
+
+                            <form onsubmit="handleAddCategory(event)" class="space-y-3">
+                                <div>
+                                    <input type="text" id="newCatLabel" required placeholder="Category Label (e.g. Medical)" class="w-full px-3 py-1.5 text-xs rounded-lg border border-slate-300 focus:ring-2 focus:ring-emerald-500 outline-none">
+                                </div>
+                                <div class="grid grid-cols-2 gap-2">
+                                    <div>
+                                        <select id="newCatIcon" class="w-full px-2 py-1.5 text-xs rounded-lg border border-slate-300 bg-white">
+                                            <option value="🛒">🛒 Grocery</option>
+                                            <option value="🥛">🥛 Milk</option>
+                                            <option value="🥬">🥬 Vegetables</option>
+                                            <option value="🍎">🍎 Fruits</option>
+                                            <option value="💡">💡 Utilities</option>
+                                            <option value="💊">💊 Medical</option>
+                                            <option value="⛽">⛽ Transport</option>
+                                            <option value="🏠">🏠 Household</option>
+                                            <option value="🎓">🎓 Education</option>
+                                            <option value="🎁">🎁 Gifts</option>
+                                            <option value="🔧">🔧 Maintenance</option>
+                                            <option value="🧾">🧾 Other / Bill</option>
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <select id="newCatColor" class="w-full px-2 py-1.5 text-xs rounded-lg border border-slate-300 bg-white">
+                                            <option value="emerald">Emerald</option>
+                                            <option value="sky">Sky Blue</option>
+                                            <option value="lime">Lime</option>
+                                            <option value="orange">Orange</option>
+                                            <option value="amber">Amber</option>
+                                            <option value="rose">Rose</option>
+                                            <option value="violet">Violet</option>
+                                            <option value="indigo">Indigo</option>
+                                            <option value="slate">Slate</option>
+                                        </select>
+                                    </div>
+                                </div>
+                                <button type="submit" class="w-full py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold rounded-lg transition">
+                                    + Add New Category
+                                </button>
+                            </form>
+
+                            <!-- Categories List Tags -->
+                            <div>
+                                <label class="block text-[11px] font-medium text-slate-500 mb-2">Active Categories:</label>
+                                <div id="categoriesPillList" class="flex flex-wrap gap-2 max-h-36 overflow-y-auto p-1">
+                                    <!-- Dynamic Category Pills -->
+                                </div>
+                            </div>
+                        </div>
+
+                    </div>
+                </div>
+
+            </div>
+        </section>
+
+        <!-- ================= TAB 4: CREDIT CARDS STATEMENT TRACKER ================= -->
+        <section id="sec-creditCards" class="tab-content hidden space-y-6">
+            <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-5 sm:p-6 space-y-6">
+                <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 pb-4 border-b border-slate-100">
+                    <div>
+                        <h2 class="text-base font-bold text-slate-900">Credit Card Statement Tracker</h2>
+                        <p class="text-xs text-slate-500">Track monthly credit card bills, due dates, and payment statuses.</p>
+                    </div>
+                    <button onclick="toggleCardForm()" class="py-2 px-3.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold rounded-lg transition shadow-sm">
+                        + Add Credit Card
+                    </button>
+                </div>
+
+                <!-- Add Card Collapsible Form -->
+                <div id="addCardFormBox" class="hidden p-4 rounded-xl bg-slate-50 border border-slate-200">
+                    <form onsubmit="handleSaveCard(event)" class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                        <div>
+                            <label class="block text-xs font-medium text-slate-700 mb-1">Card Name / Bank *</label>
+                            <input type="text" id="cardName" required placeholder="HDFC Regalia, ICICI Amazon" class="w-full px-3 py-1.5 text-xs rounded-lg border border-slate-300">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-medium text-slate-700 mb-1">Last 4 Digits *</label>
+                            <input type="text" id="cardDigits" maxlength="4" required placeholder="1234" class="w-full px-3 py-1.5 text-xs rounded-lg border border-slate-300">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-medium text-slate-700 mb-1">Monthly Statement Date *</label>
+                            <input type="number" id="cardStatementDay" min="1" max="31" required placeholder="Day of month (e.g. 15)" class="w-full px-3 py-1.5 text-xs rounded-lg border border-slate-300">
+                        </div>
+                        <div class="sm:col-span-3 flex justify-end gap-2">
+                            <button type="button" onclick="toggleCardForm()" class="py-1.5 px-3 text-xs bg-slate-200 text-slate-700 rounded-lg">Cancel</button>
+                            <button type="submit" class="py-1.5 px-4 text-xs bg-indigo-600 text-white font-semibold rounded-lg">Save Card</button>
+                        </div>
+                    </form>
+                </div>
+
+                <!-- Cards Grid -->
+                <div id="creditCardsGrid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    <!-- Dynamic Cards -->
+                </div>
+            </div>
+        </section>
+
+        <!-- ================= TAB 5: ANALYTICS & CHARTS ================= -->
+        <section id="sec-analytics" class="tab-content hidden space-y-6">
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <!-- Category Breakdown Chart -->
+                <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-5">
+                    <h3 class="text-sm font-bold text-slate-900 mb-4">Category-Wise Spend Breakdown</h3>
+                    <div class="h-64 relative">
+                        <canvas id="categoryChart"></canvas>
+                    </div>
+                </div>
+
+                <!-- Monthly Spend Trend Chart -->
+                <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-5">
+                    <h3 class="text-sm font-bold text-slate-900 mb-4">Monthly Spending Trend</h3>
+                    <div class="h-64 relative">
+                        <canvas id="monthlyTrendChart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- ================= MODALS ================= -->
+
+    <!-- 1. Admin PIN Modal -->
+    <div id="adminPinModal" class="hidden fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl shadow-xl border border-slate-200 max-w-sm w-full p-6 text-center space-y-4">
+            <div class="w-12 h-12 bg-slate-900 text-amber-400 rounded-xl flex items-center justify-center mx-auto text-xl shadow-md">
+                <i class="fa-solid fa-key"></i>
+            </div>
+            <div>
+                <h3 class="text-base font-bold text-slate-900">Enter Admin Security PIN</h3>
+                <p class="text-xs text-slate-500 mt-1">Unlock Admin Mode to manage settlements and settings.</p>
+            </div>
+            <div>
+                <input type="password" id="adminPinInput" maxlength="4" placeholder="••••" class="w-36 text-center text-2xl font-bold tracking-widest py-2 border-2 border-slate-300 rounded-xl focus:ring-2 focus:ring-slate-900 focus:border-slate-900 outline-none">
+            </div>
+            <div class="flex gap-2">
+                <button onclick="closeAdminPinModal()" class="flex-1 py-2 text-xs font-semibold bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg">Cancel</button>
+                <button onclick="verifyAdminPin()" class="flex-1 py-2 text-xs font-semibold bg-slate-900 hover:bg-slate-800 text-white rounded-lg">Unlock Admin</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 2. QR Code Scan-to-Pay Modal -->
+    <div id="qrPayModal" class="hidden fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl shadow-xl border border-slate-200 max-w-md w-full p-6 text-center space-y-4">
+            <div class="flex justify-between items-center pb-2 border-b border-slate-100">
+                <h3 class="text-sm font-bold text-slate-900">Scan Shopkeeper QR Code</h3>
+                <button onclick="closeQrPayModal()" class="text-slate-400 hover:text-slate-600 text-sm"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            
+            <div class="p-3 bg-slate-50 rounded-xl border border-slate-200 flex flex-col items-center">
+                <img id="qrModalImage" src="" alt="Shopkeeper QR Code" class="max-h-64 object-contain rounded-lg border border-slate-300 shadow-sm mb-3">
+                <p id="qrModalTitle" class="text-sm font-bold text-slate-800"></p>
+                <p id="qrModalAmount" class="text-lg font-extrabold text-emerald-600 mt-0.5"></p>
+                <p id="qrModalUpi" class="text-xs text-slate-500 font-mono mt-1"></p>
+            </div>
+
+            <div class="flex gap-2">
+                <button onclick="closeQrPayModal()" class="flex-1 py-2.5 text-xs font-semibold bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg">Close</button>
+                <button id="confirmPayBtn" onclick="" class="flex-1 py-2.5 text-xs font-semibold bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg shadow-sm">
+                    <i class="fa-solid fa-circle-check"></i> Mark Paid & Settled
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 3. Export & Statement Modal -->
+    <div id="exportModal" class="hidden fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl shadow-xl border border-slate-200 max-w-md w-full p-6 space-y-4">
+            <div class="flex justify-between items-center pb-2 border-b border-slate-100">
+                <h3 class="text-sm font-bold text-slate-900"><i class="fa-solid fa-file-export text-teal-600"></i> Export & Print Reports</h3>
+                <button onclick="closeExportModal()" class="text-slate-400 hover:text-slate-600 text-sm"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+
+            <div class="space-y-3">
+                <div>
+                    <label class="block text-xs font-medium text-slate-700 mb-1">Select Month / Period:</label>
+                    <input type="month" id="exportMonthSelect" class="w-full px-3 py-2 text-xs rounded-lg border border-slate-300">
+                </div>
+
+                <div class="grid grid-cols-2 gap-3 pt-2">
+                    <button onclick="downloadCSVReport()" class="py-3 px-3 bg-emerald-50 border border-emerald-200 text-emerald-800 hover:bg-emerald-100 rounded-xl text-xs font-bold transition flex flex-col items-center gap-1 text-center">
+                        <i class="fa-solid fa-file-csv text-lg text-emerald-600"></i>
+                        <span>Download CSV Report</span>
+                    </button>
+
+                    <button onclick="triggerPrintStatement()" class="py-3 px-3 bg-sky-50 border border-sky-200 text-sky-800 hover:bg-sky-100 rounded-xl text-xs font-bold transition flex flex-col items-center gap-1 text-center">
+                        <i class="fa-solid fa-print text-lg text-sky-600"></i>
+                        <span>Print Monthly Statement</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 4. Custom Message / Alert Modal (Replaces native alert) -->
+    <div id="customAlertModal" class="hidden fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl shadow-xl border border-slate-200 max-w-xs w-full p-5 text-center space-y-3">
+            <div id="alertModalIcon" class="w-10 h-10 rounded-full flex items-center justify-center mx-auto text-lg"></div>
+            <h4 id="alertModalTitle" class="text-sm font-bold text-slate-900"></h4>
+            <p id="alertModalMessage" class="text-xs text-slate-600"></p>
+            <button onclick="closeCustomAlert()" class="w-full py-2 bg-slate-900 text-white text-xs font-semibold rounded-lg">OK</button>
+        </div>
+    </div>
+
+    <!-- Printable Statement Container (Only visible during window.print) -->
+    <div id="printableStatement" class="hidden print-only p-8">
+        <div class="text-center mb-6">
+            <h1 class="text-2xl font-bold">Family Expense Statement</h1>
+            <p id="printHeaderPeriod" class="text-sm text-gray-600"></p>
+            <p class="text-xs text-gray-500">Generated on: <span id="printHeaderGenerated"></span></p>
+        </div>
+        <table class="w-full border-collapse border border-gray-300 text-xs">
+            <thead>
+                <tr class="bg-gray-100">
+                    <th class="border border-gray-300 p-2">Date</th>
+                    <th class="border border-gray-300 p-2">Category</th>
+                    <th class="border border-gray-300 p-2">Title / Description</th>
+                    <th class="border border-gray-300 p-2">Member / Paid By</th>
+                    <th class="border border-gray-300 p-2">Status</th>
+                    <th class="border border-gray-300 p-2 text-right">Amount (₹)</th>
+                </tr>
+            </thead>
+            <tbody id="printableTableBody">
+                <!-- Dynamic Rows -->
+            </tbody>
+        </table>
+        <div class="mt-4 text-right font-bold text-sm">
+            Total Expense: <span id="printHeaderTotal">₹0</span>
+        </div>
+    </div>
+
+    <!-- Application JavaScript Logic -->
+    <script>
+        // --- 1. Firebase Firestore Setup ---
+        const firebaseConfig = {
+            apiKey: "AIzaSyDummyKeyForStudioProject7180408177",
+            authDomain: "studio-7180408177-1e90e.firebaseapp.com",
+            projectId: "studio-7180408177-1e90e",
+            storageBucket: "studio-7180408177-1e90e.appspot.com",
+            messagingSenderId: "7180408177",
+            appId: "1:7180408177:web:1e90e000000000"
+        };
+
+        let db = null;
+        try {
+            firebase.initializeApp(firebaseConfig);
+            db = firebase.firestore();
+        } catch (e) {
+            console.error("Firebase init fallback:", e);
+        }
+
+        // --- 2. Application State ---
+        let isAdminUnlocked = false;
+        let attachedQrBase64 = "";
+
+        // Default Family Members & Categories
+        let familyMembers = ['Papa', 'Mummy', 'Bhai', 'Vikash'];
+        let familyCategories = [
+            { id: 'grocery', label: 'Grocery', icon: '🛒', color: 'emerald' },
+            { id: 'milk', label: 'Milk', icon: '🥛', color: 'sky' },
+            { id: 'vegetables', label: 'Vegetables', icon: '🥬', color: 'lime' },
+            { id: 'fruits', label: 'Fruits', icon: '🍎', color: 'orange' },
+            { id: 'bills', label: 'Bills & Utilities', icon: '💡', color: 'amber' },
+            { id: 'medical', label: 'Medical', icon: '💊', color: 'rose' },
+            { id: 'transport', label: 'Transport', icon: '⛽', color: 'violet' },
+            { id: 'household', label: 'Household', icon: '🏠', color: 'indigo' },
+            { id: 'other', label: 'Other', icon: '🧾', color: 'slate' }
+        ];
+
+        let expensesList = [];
+        let creditCardsList = [];
+
+        // Chart Instances
+        let categoryChartInstance = null;
+        let monthlyTrendChartInstance = null;
+
+        // --- 3. Initialization ---
+        window.addEventListener('DOMContentLoaded', () => {
+            // Set default date to today
+            const today = new Date().toISOString().split('T')[0];
+            document.getElementById('expDate').value = today;
+            
+            // Set current month filter default
+            const currentMonth = new Date().toISOString().slice(0, 7);
+            document.getElementById('filterMonth').value = currentMonth;
+            document.getElementById('exportMonthSelect').value = currentMonth;
+            document.getElementById('currentMonthYearLabel').innerText = new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+
+            // Initialize Firestore Sync
+            initFirestoreListeners();
+        });
+
+        // Custom Modal Alert replacement
+        function showAlert(title, message, type = 'info') {
+            const modal = document.getElementById('customAlertModal');
+            const iconBox = document.getElementById('alertModalIcon');
+            document.getElementById('alertModalTitle').innerText = title;
+            document.getElementById('alertModalMessage').innerText = message;
+
+            if (type === 'success') {
+                iconBox.className = "w-10 h-10 rounded-full flex items-center justify-center mx-auto text-lg bg-emerald-100 text-emerald-600";
+                iconBox.innerHTML = '<i class="fa-solid fa-circle-check"></i>';
+            } else if (type === 'error') {
+                iconBox.className = "w-10 h-10 rounded-full flex items-center justify-center mx-auto text-lg bg-rose-100 text-rose-600";
+                iconBox.innerHTML = '<i class="fa-solid fa-triangle-exclamation"></i>';
+            } else {
+                iconBox.className = "w-10 h-10 rounded-full flex items-center justify-center mx-auto text-lg bg-sky-100 text-sky-600";
+                iconBox.innerHTML = '<i class="fa-solid fa-circle-info"></i>';
+            }
+            modal.classList.remove('hidden');
+        }
+
+        function closeCustomAlert() {
+            document.getElementById('customAlertModal').classList.add('hidden');
+        }
+
+        // --- 4. Firestore Real-time Sync ---
+        function initFirestoreListeners() {
+            if (!db) return;
+
+            const syncStatus = document.getElementById('syncStatus');
+            const syncText = document.getElementById('syncStatusText');
+
+            // 1. Sync Settings (family_settings/config)
+            db.collection('family_settings').doc('config').onSnapshot(doc => {
+                if (doc.exists) {
+                    const data = doc.data();
+                    if (data.members && Array.isArray(data.members)) familyMembers = data.members;
+                    if (data.categories && Array.isArray(data.categories)) familyCategories = data.categories;
+                } else {
+                    // Seed initial config
+                    db.collection('family_settings').doc('config').set({
+                        members: familyMembers,
+                        categories: familyCategories
+                    });
+                }
+                updateDropdownsAndAdminSettingsUI();
+            }, err => {
+                console.error("Settings sync error:", err);
+            });
+
+            // 2. Sync Expenses (family_expenses)
+            db.collection('family_expenses').orderBy('date', 'desc').onSnapshot(snapshot => {
+                expensesList = [];
+                snapshot.forEach(doc => {
+                    expensesList.push({ id: doc.id, ...doc.data() });
+                });
+                syncStatus.className = "inline-block w-2 h-2 rounded-full bg-emerald-500 animate-pulse";
+                syncText.innerText = "Firestore Live Syncing";
+                
+                renderAllViews();
+            }, err => {
+                console.error("Expenses sync error:", err);
+                syncStatus.className = "inline-block w-2 h-2 rounded-full bg-rose-500";
+                syncText.innerText = "Offline Mode";
+            });
+
+            // 3. Sync Credit Cards (family_credit_cards)
+            db.collection('family_credit_cards').onSnapshot(snapshot => {
+                creditCardsList = [];
+                snapshot.forEach(doc => {
+                    creditCardsList.push({ id: doc.id, ...doc.data() });
+                });
+                renderCreditCards();
+            });
+        }
+
+        // Update Member & Category dropdowns dynamically
+        function updateDropdownsAndAdminSettingsUI() {
+            // Category Select in Form
+            const expCatSelect = document.getElementById('expCategory');
+            expCatSelect.innerHTML = familyCategories.map(cat => 
+                `<option value="${cat.id}">${cat.icon} ${cat.label}</option>`
+            ).join('');
+
+            // Member Select in Form
+            const expPaidBySelect = document.getElementById('expPaidBy');
+            expPaidBySelect.innerHTML = familyMembers.map(m => 
+                `<option value="${m}">${m}</option>`
+            ).join('');
+
+            // Member Filter in History
+            const filterMemberSelect = document.getElementById('filterMember');
+            const currentSelected = filterMemberSelect.value;
+            filterMemberSelect.innerHTML = `<option value="ALL">All Family Members</option>` + 
+                familyMembers.map(m => `<option value="${m}">${m}</option>`).join('');
+            filterMemberSelect.value = currentSelected || 'ALL';
+
+            // Admin Settings Member Pills
+            const membersPillList = document.getElementById('membersPillList');
+            membersPillList.innerHTML = familyMembers.map(m => `
+                <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-sky-100 text-sky-800 border border-sky-200">
+                    ${m}
+                    <button onclick="handleDeleteMember('${m}')" class="ml-1.5 text-sky-600 hover:text-rose-600 focus:outline-none">&times;</button>
+                </span>
+            `).join('');
+
+            // Admin Settings Category Pills
+            const categoriesPillList = document.getElementById('categoriesPillList');
+            categoriesPillList.innerHTML = familyCategories.map(cat => `
+                <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold badge-color-${cat.color} border">
+                    <span class="mr-1">${cat.icon}</span> ${cat.label}
+                    <button onclick="handleDeleteCategory('${cat.id}')" class="ml-1.5 hover:text-rose-600 focus:outline-none">&times;</button>
+                </span>
+            `).join('');
+        }
+
+        // --- 5. Form Dynamic Interactions ---
+        function handlePaymentStatusChange(status) {
+            const wrapper = document.getElementById('memberSelectorWrapper');
+            const label = document.getElementById('memberSelectLabel');
+            const select = document.getElementById('expPaidBy');
+            const lblPaid = document.getElementById('lblStatusPaid');
+            const lblPending = document.getElementById('lblStatusPending');
+
+            if (status === 'paid') {
+                lblPaid.className = "flex items-center justify-center p-3 rounded-lg border-2 border-emerald-500 bg-emerald-50 cursor-pointer transition text-xs font-bold text-emerald-900";
+                lblPending.className = "flex items-center justify-center p-3 rounded-lg border border-slate-300 bg-white cursor-pointer hover:border-amber-400 transition text-xs font-medium text-slate-700";
+                
+                wrapper.className = "p-3 rounded-lg bg-emerald-100/70 border border-emerald-300 transition-all";
+                label.className = "block text-xs font-bold text-emerald-950 mb-1.5";
+                label.innerHTML = '<i class="fa-solid fa-hand-holding-dollar text-emerald-700 mr-1"></i> Who Paid Locally? *';
+                select.className = "w-full px-3.5 py-2 text-sm rounded-lg border border-emerald-400 bg-white focus:ring-2 focus:ring-emerald-500 outline-none font-semibold text-slate-900 transition";
+            } else {
+                lblPending.className = "flex items-center justify-center p-3 rounded-lg border-2 border-amber-500 bg-amber-50 cursor-pointer transition text-xs font-bold text-amber-900";
+                lblPaid.className = "flex items-center justify-center p-3 rounded-lg border border-slate-300 bg-white cursor-pointer hover:border-emerald-400 transition text-xs font-medium text-slate-700";
+                
+                wrapper.className = "p-3 rounded-lg bg-amber-100/60 border border-amber-200 transition-all";
+                label.className = "block text-xs font-bold text-amber-900 mb-1.5";
+                label.innerHTML = '<i class="fa-solid fa-user-pen text-amber-700 mr-1"></i> Entered By (Family Member) *';
+                select.className = "w-full px-3.5 py-2 text-sm rounded-lg border border-amber-300 bg-white focus:ring-2 focus:ring-amber-500 outline-none font-medium text-slate-800 transition";
+            }
+        }
+
+        // Compression canvas for QR Image Upload
+        function handleQrFileUpload(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const img = new Image();
+                img.onload = function() {
+                    const canvas = document.createElement('canvas');
+                    const MAX_WIDTH = 500;
+                    let width = img.width;
+                    let height = img.height;
+
+                    if (width > MAX_WIDTH) {
+                        height = Math.round((height * MAX_WIDTH) / width);
+                        width = MAX_WIDTH;
+                    }
+
+                    canvas.width = width;
+                    canvas.height = height;
+                    const ctx = canvas.getContext('2d');
+                    ctx.drawImage(img, 0, 0, width, height);
+
+                    attachedQrBase64 = canvas.toDataURL('image/jpeg', 0.7);
+                    document.getElementById('qrPreviewImg').src = attachedQrBase64;
+                    document.getElementById('qrPreviewBox').classList.remove('hidden');
+                };
+                img.src = e.target.result;
+            };
+            reader.readAsDataURL(file);
+        }
+
+        function removeQrImage() {
+            attachedQrBase64 = "";
+            document.getElementById('expQrFile').value = "";
+            document.getElementById('qrPreviewBox').classList.add('hidden');
+        }
+
+        // --- 6. Save Expense Handler ---
+        async function handleSaveExpense(e) {
+            e.preventDefault();
+
+            const title = document.getElementById('expTitle').value.trim();
+            const amount = parseFloat(document.getElementById('expAmount').value);
+            const categoryId = document.getElementById('expCategory').value;
+            const date = document.getElementById('expDate').value;
+            const statusRadio = document.querySelector('input[name="paymentStatus"]:checked').value;
+            const paidBy = document.getElementById('expPaidBy').value;
+            const upiId = document.getElementById('expUpiId').value.trim();
+            const notes = document.getElementById('expNotes').value.trim();
+
+            if (!title || isNaN(amount) || amount <= 0 || !paidBy) {
+                showAlert('Error', 'Please fill in all required fields accurately.', 'error');
+                return;
+            }
+
+            const newExpense = {
+                title,
+                amount,
+                category: categoryId,
+                date,
+                status: statusRadio,
+                paidBy,
+                upiId: upiId || null,
+                qrImage: attachedQrBase64 || null,
+                notes: notes || '',
+                createdAt: new Date().toISOString()
+            };
+
+            try {
+                if (db) {
+                    await db.collection('family_expenses').add(newExpense);
+                } else {
+                    expensesList.unshift({ id: 'local_' + Date.now(), ...newExpense });
+                    renderAllViews();
+                }
+
+                // Reset form
+                document.getElementById('expenseForm').reset();
+                const today = new Date().toISOString().split('T')[0];
+                document.getElementById('expDate').value = today;
+                removeQrImage();
+                handlePaymentStatusChange('pending');
+
+                showAlert('Success', 'Expense recorded successfully!', 'success');
+            } catch (err) {
+                console.error("Save expense error:", err);
+                showAlert('Error', 'Failed to save expense. Please check connection.', 'error');
+            }
+        }
+
+        // --- 7. Admin Settings Actions (Members & Categories) ---
+        async function handleAddMember(e) {
+            e.preventDefault();
+            if (!isAdminUnlocked) return;
+            const input = document.getElementById('newMemberInput');
+            const name = input.value.trim();
+
+            if (!name) return;
+            if (familyMembers.includes(name)) {
+                showAlert('Notice', 'Member already exists in list.', 'info');
+                return;
+            }
+
+            const updatedMembers = [...familyMembers, name];
+            await syncSettingsToFirestore(updatedMembers, familyCategories);
+            input.value = "";
+            showAlert('Success', `Added member '${name}'`, 'success');
+        }
+
+        async function handleDeleteMember(memberName) {
+            if (!isAdminUnlocked) return;
+            if (familyMembers.length <= 1) {
+                showAlert('Cannot Delete', 'At least 1 family member is required.', 'error');
+                return;
+            }
+
+            const updatedMembers = familyMembers.filter(m => m !== memberName);
+            await syncSettingsToFirestore(updatedMembers, familyCategories);
+            showAlert('Deleted', `Removed member '${memberName}'`, 'info');
+        }
+
+        async function handleAddCategory(e) {
+            e.preventDefault();
+            if (!isAdminUnlocked) return;
+            
+            const label = document.getElementById('newCatLabel').value.trim();
+            const icon = document.getElementById('newCatIcon').value;
+            const color = document.getElementById('newCatColor').value;
+
+            if (!label) return;
+            const id = label.toLowerCase().replace(/[^a-z0-9]/g, '_');
+
+            if (familyCategories.some(c => c.id === id)) {
+                showAlert('Notice', 'Category already exists.', 'info');
+                return;
+            }
+
+            const updatedCategories = [...familyCategories, { id, label, icon, color }];
+            await syncSettingsToFirestore(familyMembers, updatedCategories);
+            document.getElementById('newCatLabel').value = "";
+            showAlert('Success', `Added category '${label}'`, 'success');
+        }
+
+        async function handleDeleteCategory(catId) {
+            if (!isAdminUnlocked) return;
+            if (familyCategories.length <= 1) {
+                showAlert('Cannot Delete', 'At least 1 expense category is required.', 'error');
+                return;
+            }
+
+            const updatedCategories = familyCategories.filter(c => c.id !== catId);
+            await syncSettingsToFirestore(familyMembers, updatedCategories);
+            showAlert('Deleted', 'Category removed successfully.', 'info');
+        }
+
+        async function syncSettingsToFirestore(membersArr, categoriesArr) {
+            familyMembers = membersArr;
+            familyCategories = categoriesArr;
+            updateDropdownsAndAdminSettingsUI();
+
+            if (db) {
+                try {
+                    await db.collection('family_settings').doc('config').set({
+                        members: membersArr,
+                        categories: categoriesArr
+                    });
+                } catch (err) {
+                    console.error("Firestore settings save error:", err);
+                }
+            }
+        }
+
+        // --- 8. Render Views & History Table ---
+        function renderAllViews() {
+            renderExpenseHistory();
+            renderAdminSettlement();
+            updateTopStats();
+            renderAnalyticsCharts();
+        }
+
+        function renderExpenseHistory() {
+            const tbody = document.getElementById('historyTableBody');
+            const memberFilter = document.getElementById('filterMember').value;
+            const statusFilter = document.getElementById('filterStatus').value;
+            const monthFilter = document.getElementById('filterMonth').value;
+
+            let filtered = expensesList.filter(item => {
+                if (memberFilter !== 'ALL' && item.paidBy !== memberFilter) return false;
+                if (statusFilter !== 'ALL' && item.status !== statusFilter) return false;
+                if (monthFilter && item.date && !item.date.startsWith(monthFilter)) return false;
+                return true;
+            });
+
+            if (filtered.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="7" class="text-center py-8 text-slate-400">No expenses found matching the selected filters.</td></tr>`;
+                return;
+            }
+
+            tbody.innerHTML = filtered.map(item => {
+                const catObj = familyCategories.find(c => c.id === item.category) || { label: item.category, icon: '🧾', color: 'slate' };
+                const isPaid = item.status === 'paid';
+                
+                // Badge Logic
+                let memberBadgeHTML = "";
+                if (isPaid) {
+                    memberBadgeHTML = `<span class="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-medium bg-emerald-100 text-emerald-800"><i class="fa-solid fa-circle-check mr-1 text-[10px]"></i> Paid by ${item.paidBy || 'Member'}</span>`;
+                } else {
+                    memberBadgeHTML = `<span class="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-medium bg-amber-100 text-amber-800"><i class="fa-solid fa-clock mr-1 text-[10px]"></i> Added by ${item.paidBy || 'Member'} • Pending Admin</span>`;
+                }
+
+                return `
+                    <tr class="hover:bg-slate-50/80 transition">
+                        <td class="py-3 px-3 font-medium text-slate-700 whitespace-nowrap">${item.date}</td>
+                        <td class="py-3 px-3 whitespace-nowrap">
+                            <span class="inline-flex items-center px-2 py-1 rounded-md text-[11px] font-semibold badge-color-${catObj.color} border">
+                                <span class="mr-1">${catObj.icon}</span> ${catObj.label}
+                            </span>
+                        </td>
+                        <td class="py-3 px-3">
+                            <div class="font-bold text-slate-900">${item.title}</div>
+                            ${item.notes ? `<div class="text-[11px] text-slate-500">${item.notes}</div>` : ''}
+                        </td>
+                        <td class="py-3 px-3 whitespace-nowrap">
+                            ${memberBadgeHTML}
+                        </td>
+                        <td class="py-3 px-3 text-right font-extrabold text-slate-900 whitespace-nowrap">
+                            ₹${item.amount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                        </td>
+                        <td class="py-3 px-3 text-center whitespace-nowrap">
+                            <span class="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase tracking-wide ${isPaid ? 'bg-emerald-100 text-emerald-800 border border-emerald-200' : 'bg-amber-100 text-amber-800 border border-amber-200'}">
+                                ${isPaid ? 'Paid / Settled' : 'Pending Admin'}
+                            </span>
+                        </td>
+                        <td class="py-3 px-3 text-center whitespace-nowrap">
+                            <div class="flex items-center justify-center space-x-2">
+                                ${item.qrImage || item.upiId ? `
+                                    <button onclick="openQrModal('${item.id}')" class="p-1 text-indigo-600 hover:text-indigo-800" title="View UPI / QR">
+                                        <i class="fa-solid fa-qrcode"></i>
+                                    </button>
+                                ` : ''}
+                                ${isAdminUnlocked ? `
+                                    <button onclick="toggleExpenseStatus('${item.id}')" class="p-1 text-slate-500 hover:text-emerald-600" title="Toggle Paid Status">
+                                        <i class="fa-solid fa-arrows-rotate"></i>
+                                    </button>
+                                    <button onclick="deleteExpenseItem('${item.id}')" class="p-1 text-slate-400 hover:text-rose-600" title="Delete Expense">
+                                        <i class="fa-solid fa-trash-can"></i>
+                                    </button>
+                                ` : ''}
+                            </div>
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+        }
+
+        // --- 9. Admin Settlement Tab Content ---
+        function renderAdminSettlement() {
+            const pendingList = expensesList.filter(i => i.status === 'pending');
+            const badgeCount = document.getElementById('pendingBadgeCount');
+            const pendingItemsBadge = document.getElementById('pendingItemsBadge');
+            const pendingAdminList = document.getElementById('pendingAdminList');
+
+            if (pendingList.length > 0) {
+                badgeCount.innerText = pendingList.length;
+                badgeCount.classList.remove('hidden');
+            } else {
+                badgeCount.classList.add('hidden');
+            }
+
+            pendingItemsBadge.innerText = `${pendingList.length} Items Pending Admin Pay`;
+
+            if (pendingList.length === 0) {
+                pendingAdminList.innerHTML = `<div class="col-span-full py-8 text-center text-slate-400 bg-slate-50 rounded-xl border border-dashed border-slate-200">All expenses are completely settled! No pending Admin payments.</div>`;
+                return;
+            }
+
+            pendingAdminList.innerHTML = pendingList.map(item => {
+                const catObj = familyCategories.find(c => c.id === item.category) || { label: item.category, icon: '🧾', color: 'slate' };
+                return `
+                    <div class="bg-slate-50 rounded-xl p-4 border border-slate-200 flex flex-col justify-between space-y-3">
+                        <div>
+                            <div class="flex justify-between items-start">
+                                <span class="px-2 py-0.5 text-[10px] font-bold rounded badge-color-${catObj.color} border">
+                                    ${catObj.icon} ${catObj.label}
+                                </span>
+                                <span class="text-xs font-semibold text-slate-500">${item.date}</span>
+                            </div>
+                            <h4 class="font-bold text-slate-900 text-sm mt-2">${item.title}</h4>
+                            <p class="text-xs font-semibold text-amber-800 mt-1"><i class="fa-solid fa-user-tag"></i> Added by: <strong>${item.paidBy || 'Member'}</strong></p>
+                            <p class="text-lg font-extrabold text-slate-900 mt-1">₹${item.amount.toLocaleString('en-IN')}</p>
+                        </div>
+
+                        <div class="pt-2 border-t border-slate-200 space-y-2">
+                            ${item.qrImage ? `
+                                <button onclick="openQrModal('${item.id}')" class="w-full py-1.5 px-3 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-xs font-semibold rounded-lg transition flex items-center justify-center gap-1.5 border border-indigo-200">
+                                    <i class="fa-solid fa-qrcode"></i> Scan QR & Pay Shopkeeper
+                                </button>
+                            ` : item.upiId ? `
+                                <div class="text-[11px] bg-slate-200/70 px-2 py-1 rounded text-slate-700 font-mono text-center">UPI: ${item.upiId}</div>
+                            ` : ''}
+
+                            <button onclick="settlePendingExpense('${item.id}')" class="w-full py-2 px-3 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-lg transition shadow-sm flex items-center justify-center gap-1.5">
+                                <i class="fa-solid fa-circle-check"></i> Mark Settled / Paid
+                            </button>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        async function settlePendingExpense(id) {
+            if (!isAdminUnlocked) return;
+            if (db) {
+                await db.collection('family_expenses').doc(id).update({ status: 'paid' });
+            } else {
+                const item = expensesList.find(i => i.id === id);
+                if (item) item.status = 'paid';
+                renderAllViews();
+            }
+            showAlert('Settled', 'Expense marked as Paid successfully.', 'success');
+        }
+
+        async function toggleExpenseStatus(id) {
+            if (!isAdminUnlocked) return;
+            const item = expensesList.find(i => i.id === id);
+            if (!item) return;
+
+            const nextStatus = item.status === 'paid' ? 'pending' : 'paid';
+            if (db) {
+                await db.collection('family_expenses').doc(id).update({ status: nextStatus });
+            } else {
+                item.status = nextStatus;
+                renderAllViews();
+            }
+        }
+
+        async function deleteExpenseItem(id) {
+            if (!isAdminUnlocked) return;
+            if (db) {
+                await db.collection('family_expenses').doc(id).delete();
+            } else {
+                expensesList = expensesList.filter(i => i.id !== id);
+                renderAllViews();
+            }
+            showAlert('Deleted', 'Expense item removed.', 'info');
+        }
+
+        // --- 10. QR Pay Modal Controls ---
+        function openQrModal(id) {
+            const item = expensesList.find(i => i.id === id);
+            if (!item) return;
+
+            document.getElementById('qrModalTitle').innerText = item.title;
+            document.getElementById('qrModalAmount').innerText = `₹${item.amount.toLocaleString('en-IN')}`;
+            document.getElementById('qrModalUpi').innerText = item.upiId ? `UPI ID: ${item.upiId}` : '';
+            document.getElementById('qrModalImage').src = item.qrImage || 'https://placehold.co/300x300/f1f5f9/475569?text=No+QR+Image';
+            
+            const confirmBtn = document.getElementById('confirmPayBtn');
+            confirmBtn.onclick = async () => {
+                await settlePendingExpense(item.id);
+                closeQrPayModal();
+            };
+
+            document.getElementById('qrPayModal').classList.remove('hidden');
+        }
+
+        function closeQrPayModal() {
+            document.getElementById('qrPayModal').classList.add('hidden');
+        }
+
+        // --- 11. WhatsApp Summary Sharing ---
+        function shareWhatsAppSummary() {
+            const pending = expensesList.filter(i => i.status === 'pending');
+            if (pending.length === 0) {
+                showAlert('Summary', 'No pending expenses to summarize.', 'info');
+                return;
+            }
+
+            let total = pending.reduce((sum, i) => sum + i.amount, 0);
+            let text = `*🏡 FAMILY EXPENSE SUMMARY (Pending Admin Pay)*\n`;
+            text += `Total Amount Due: *₹${total.toLocaleString('en-IN')}*\n`;
+            text += `-----------------------------------\n`;
+
+            pending.forEach((i, idx) => {
+                text += `${idx + 1}. *${i.title}* - ₹${i.amount} (By: ${i.paidBy || 'Member'})\n`;
+            });
+
+            text += `-----------------------------------\nPlease process payments from Mumbai Admin.`;
+
+            // Copy to Clipboard standard execution
+            const dummy = document.createElement("textarea");
+            document.body.appendChild(dummy);
+            dummy.value = text;
+            dummy.select();
+            document.execCommand("copy");
+            document.body.removeChild(dummy);
+
+            showAlert('Copied!', 'WhatsApp summary copied to clipboard! You can paste it directly into WhatsApp.', 'success');
+        }
+
+        // --- 12. Stats & Analytics Charts ---
+        function updateTopStats() {
+            const currentMonth = new Date().toISOString().slice(0, 7);
+            const monthExpenses = expensesList.filter(i => i.date && i.date.startsWith(currentMonth));
+
+            const total = monthExpenses.reduce((sum, i) => sum + i.amount, 0);
+            const pending = monthExpenses.filter(i => i.status === 'pending').reduce((sum, i) => sum + i.amount, 0);
+            const paid = monthExpenses.filter(i => i.status === 'paid').reduce((sum, i) => sum + i.amount, 0);
+
+            document.getElementById('topPendingTotal').innerText = `₹${pending.toLocaleString('en-IN')}`;
+            document.getElementById('topPaidTotal').innerText = `₹${paid.toLocaleString('en-IN')}`;
+
+            document.getElementById('statMonthTotal').innerText = `₹${total.toLocaleString('en-IN')}`;
+            document.getElementById('statMonthPending').innerText = `₹${pending.toLocaleString('en-IN')}`;
+            document.getElementById('statMonthPaid').innerText = `₹${paid.toLocaleString('en-IN')}`;
+        }
+
+        function renderAnalyticsCharts() {
+            // Chart 1: Category Breakdown
+            const catMap = {};
+            expensesList.forEach(item => {
+                const catObj = familyCategories.find(c => c.id === item.category);
+                const label = catObj ? catObj.label : item.category;
+                catMap[label] = (catMap[label] || 0) + item.amount;
+            });
+
+            const catLabels = Object.keys(catMap);
+            const catData = Object.values(catMap);
+
+            if (categoryChartInstance) categoryChartInstance.destroy();
+            const ctxCat = document.getElementById('categoryChart').getContext('2d');
+            categoryChartInstance = new Chart(ctxCat, {
+                type: 'doughnut',
+                data: {
+                    labels: catLabels.length ? catLabels : ['No Data'],
+                    datasets: [{
+                        data: catData.length ? catData : [1],
+                        backgroundColor: ['#10b981', '#0ea5e9', '#84cc16', '#f97316', '#f59e0b', '#f43f5e', '#8b5cf6', '#6366f1', '#64748b']
+                    }]
+                },
+                options: { responsive: true, maintainAspectRatio: false }
+            });
+
+            // Chart 2: Monthly Trend
+            const monthMap = {};
+            expensesList.forEach(item => {
+                const month = item.date ? item.date.slice(0, 7) : 'Unknown';
+                monthMap[month] = (monthMap[month] || 0) + item.amount;
+            });
+
+            const sortedMonths = Object.keys(monthMap).sort();
+            const monthData = sortedMonths.map(m => monthMap[m]);
+
+            if (monthlyTrendChartInstance) monthlyTrendChartInstance.destroy();
+            const ctxTrend = document.getElementById('monthlyTrendChart').getContext('2d');
+            monthlyTrendChartInstance = new Chart(ctxTrend, {
+                type: 'bar',
+                data: {
+                    labels: sortedMonths,
+                    datasets: [{
+                        label: 'Total Expenses (₹)',
+                        data: monthData,
+                        backgroundColor: '#16a34a',
+                        borderRadius: 6
+                    }]
+                },
+                options: { responsive: true, maintainAspectRatio: false }
+            });
+        }
+
+        // --- 13. Credit Cards Management ---
+        function toggleCardForm() {
+            const formBox = document.getElementById('addCardFormBox');
+            formBox.classList.toggle('hidden');
+        }
+
+        async function handleSaveCard(e) {
+            e.preventDefault();
+            const name = document.getElementById('cardName').value.trim();
+            const digits = document.getElementById('cardDigits').value.trim();
+            const statementDay = parseInt(document.getElementById('cardStatementDay').value);
+
+            if (!name || !digits || isNaN(statementDay)) return;
+
+            const newCard = { name, digits, statementDay };
+            if (db) {
+                await db.collection('family_credit_cards').add(newCard);
+            } else {
+                creditCardsList.push({ id: 'card_' + Date.now(), ...newCard });
+                renderCreditCards();
+            }
+
+            document.getElementById('cardName').value = "";
+            document.getElementById('cardDigits').value = "";
+            document.getElementById('cardStatementDay').value = "";
+            toggleCardForm();
+            showAlert('Success', 'Credit card added successfully!', 'success');
+        }
+
+        function renderCreditCards() {
+            const grid = document.getElementById('creditCardsGrid');
+            if (creditCardsList.length === 0) {
+                grid.innerHTML = `<div class="col-span-full py-8 text-center text-slate-400 bg-slate-50 rounded-xl border border-dashed">No credit cards added yet. Click "+ Add Credit Card" above.</div>`;
+                return;
+            }
+
+            grid.innerHTML = creditCardsList.map(card => `
+                <div class="bg-gradient-to-br from-slate-900 via-slate-800 to-indigo-950 text-white rounded-2xl p-5 shadow-md flex flex-col justify-between space-y-4">
+                    <div class="flex justify-between items-start">
+                        <div>
+                            <p class="text-xs text-slate-400 font-medium">Credit Card Tracker</p>
+                            <h3 class="font-bold text-base mt-0.5">${card.name}</h3>
+                        </div>
+                        <i class="fa-solid fa-credit-card text-indigo-400 text-xl"></i>
+                    </div>
+                    <div class="text-lg tracking-widest font-mono text-slate-300">
+                        •••• •••• •••• <strong>${card.digits}</strong>
+                    </div>
+                    <div class="flex justify-between items-center text-xs border-t border-slate-700/80 pt-3">
+                        <span class="text-slate-400">Statement Date: <strong>Day ${card.statementDay}</strong></span>
+                        ${isAdminUnlocked ? `
+                            <button onclick="deleteCreditCard('${card.id}')" class="text-rose-400 hover:text-rose-300 text-xs">
+                                <i class="fa-solid fa-trash-can"></i>
+                            </button>
+                        ` : ''}
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        async function deleteCreditCard(id) {
+            if (!isAdminUnlocked) return;
+            if (db) {
+                await db.collection('family_credit_cards').doc(id).delete();
+            } else {
+                creditCardsList = creditCardsList.filter(c => c.id !== id);
+                renderCreditCards();
+            }
+        }
+
+        // --- 14. Export & Reports Modal ---
+        function openExportModal() {
+            document.getElementById('exportModal').classList.remove('hidden');
+        }
+        function closeExportModal() {
+            document.getElementById('exportModal').classList.add('hidden');
+        }
+
+        function downloadCSVReport() {
+            const month = document.getElementById('exportMonthSelect').value;
+            const filtered = expensesList.filter(i => !month || (i.date && i.date.startsWith(month)));
+
+            let csvContent = "data:text/csv;charset=utf-8,";
+            csvContent += "Date,Category,Title,Amount (INR),Status,Paid By / Member,Notes\n";
+
+            filtered.forEach(i => {
+                const catObj = familyCategories.find(c => c.id === i.category);
+                const catLabel = catObj ? catObj.label : i.category;
+                const row = `"${i.date}","${catLabel}","${i.title.replace(/"/g, '""')}","${i.amount}","${i.status}","${i.paidBy || ''}","${(i.notes||'').replace(/"/g, '""')}"`;
+                csvContent += row + "\n";
+            });
+
+            const encodedUri = encodeURI(csvContent);
+            const link = document.createElement("a");
+            link.setAttribute("href", encodedUri);
+            link.setAttribute("download", `family_expense_report_${month || 'all'}.csv`);
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            closeExportModal();
+        }
+
+        function triggerPrintStatement() {
+            const month = document.getElementById('exportMonthSelect').value;
+            const filtered = expensesList.filter(i => !month || (i.date && i.date.startsWith(month)));
+
+            document.getElementById('printHeaderPeriod').innerText = month ? `Statement for Month: ${month}` : `Full Statement Report`;
+            document.getElementById('printHeaderGenerated').innerText = new Date().toLocaleString();
+
+            const tbody = document.getElementById('printableTableBody');
+            let total = 0;
+
+            tbody.innerHTML = filtered.map(i => {
+                total += i.amount;
+                const catObj = familyCategories.find(c => c.id === i.category);
+                return `
+                    <tr>
+                        <td class="border border-gray-300 p-2">${i.date}</td>
+                        <td class="border border-gray-300 p-2">${catObj ? catObj.label : i.category}</td>
+                        <td class="border border-gray-300 p-2">${i.title}</td>
+                        <td class="border border-gray-300 p-2">${i.paidBy || 'Member'}</td>
+                        <td class="border border-gray-300 p-2 capitalize">${i.status}</td>
+                        <td class="border border-gray-300 p-2 text-right">₹${i.amount}</td>
+                    </tr>
+                `;
+            }).join('');
+
+            document.getElementById('printHeaderTotal').innerText = `₹${total.toLocaleString('en-IN')}`;
+
+            closeExportModal();
+            window.print();
+        }
+
+        // --- 15. Admin Lock / Auth Security ---
+        function toggleAdminAuthModal() {
+            if (isAdminUnlocked) {
+                // Lock Admin
+                isAdminUnlocked = false;
+                updateAdminStateUI();
+                showAlert('Admin Locked', 'Logged out of Mumbai Admin Mode.', 'info');
+            } else {
+                openAdminPinModal();
+            }
+        }
+
+        function openAdminPinModal() {
+            document.getElementById('adminPinInput').value = "";
+            document.getElementById('adminPinModal').classList.remove('hidden');
+        }
+        function closeAdminPinModal() {
+            document.getElementById('adminPinModal').classList.add('hidden');
+        }
+
+        function verifyAdminPin() {
+            const pin = document.getElementById('adminPinInput').value;
+            if (pin === '1234') {
+                isAdminUnlocked = true;
+                closeAdminPinModal();
+                updateAdminStateUI();
+                showAlert('Admin Unlocked', 'Mumbai Admin Mode is active.', 'success');
+            } else {
+                showAlert('Security Check', 'Incorrect 4-digit PIN.', 'error');
+            }
+        }
+
+        function updateAdminStateUI() {
+            const badge = document.getElementById('modeBadge');
+            const btnText = document.getElementById('adminBtnText');
+            const lockIcon = document.getElementById('adminLockIcon');
+            const lockedNotice = document.getElementById('adminLockedNotice');
+            const unlockedView = document.getElementById('adminUnlockedView');
+
+            if (isAdminUnlocked) {
+                badge.className = "hidden sm:flex items-center px-3 py-1 rounded-full text-xs font-bold bg-amber-100 text-amber-900 border border-amber-300";
+                badge.innerHTML = '<i class="fa-solid fa-user-shield mr-1.5 text-amber-600"></i> Mumbai Admin Mode';
+                btnText.innerText = "Lock Admin";
+                lockIcon.className = "fa-solid fa-unlock mr-1.5 text-emerald-400";
+
+                lockedNotice.classList.add('hidden');
+                unlockedView.classList.remove('hidden');
+            } else {
+                badge.className = "hidden sm:flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-800 border border-emerald-200";
+                badge.innerHTML = '<i class="fa-solid fa-house-user mr-1.5"></i> Jharkhand Mode';
+                btnText.innerText = "Unlock Admin (Mumbai)";
+                lockIcon.className = "fa-solid fa-lock mr-1.5 text-amber-400";
+
+                lockedNotice.classList.remove('hidden');
+                unlockedView.classList.add('hidden');
+            }
+
+            renderAllViews();
+            renderCreditCards();
+        }
+
+        // --- 16. Navigation Tab Switcher ---
+        function switchTab(tabId) {
+            document.querySelectorAll('.tab-content').forEach(sec => sec.classList.add('hidden'));
+            document.querySelectorAll('.tab-btn').forEach(btn => {
+                btn.className = "tab-btn flex-1 min-w-[130px] py-2.5 px-3 rounded-lg text-xs font-semibold text-center transition flex items-center justify-center gap-1.5 text-slate-600 hover:bg-slate-100 relative";
+            });
+
+            document.getElementById(`sec-${tabId}`).classList.remove('hidden');
+            const activeBtn = document.getElementById(`tab-${tabId}`);
+            activeBtn.className = "tab-btn flex-1 min-w-[130px] py-2.5 px-3 rounded-lg text-xs font-semibold text-center transition flex items-center justify-center gap-1.5 bg-emerald-600 text-white shadow-sm relative";
+
+            if (tabId === 'analytics') {
+                renderAnalyticsCharts();
+            }
+        }
+    </script>
+</body>
+</html>
