@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Family Expense Tracker - Jharkhand & Mumbai Admin</title>
+    <title>Family Expense Tracker </title>
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Font Awesome Icons -->
@@ -80,7 +80,7 @@
 
                     <button id="adminToggleBtn" onclick="toggleAdminAuthModal()" class="flex items-center px-3.5 py-1.5 rounded-lg text-xs font-medium bg-slate-800 text-white hover:bg-slate-700 transition shadow-sm">
                         <i id="adminLockIcon" class="fa-solid fa-lock mr-1.5 text-amber-400"></i>
-                        <span id="adminBtnText">Unlock Admin (Mumbai)</span>
+                        <span id="adminBtnText">Unlock Admin</span>
                     </button>
                 </div>
             </div>
@@ -133,7 +133,7 @@
                     <div class="flex justify-between items-center mb-5 pb-3 border-b border-slate-100">
                         <div>
                             <h2 class="text-base font-bold text-slate-900">Add New Family Expense</h2>
-                            <p class="text-xs text-slate-500">Record an expense locally paid in Jharkhand or request Admin (Mumbai) payment.</p>
+                            <p class="text-xs text-slate-500">Record an expense locally paid in Jharkhand or request Admin payment.</p>
                         </div>
                         <span class="px-2.5 py-1 text-[11px] font-semibold bg-emerald-50 text-emerald-700 rounded-full border border-emerald-200">
                             Jharkhand Entry Form
@@ -181,7 +181,7 @@
                                     </label>
                                     <label id="lblStatusPending" class="flex items-center justify-center p-3 rounded-lg border-2 border-amber-500 bg-amber-50 cursor-pointer transition text-xs font-semibold text-amber-900">
                                         <input type="radio" name="paymentStatus" value="pending" checked onchange="handlePaymentStatusChange('pending')" class="sr-only">
-                                        <i class="fa-solid fa-clock text-amber-500 mr-2 text-sm"></i> Need Admin (Mumbai) to Pay
+                                        <i class="fa-solid fa-clock text-amber-500 mr-2 text-sm"></i> Need Admin to Pay
                                     </label>
                                 </div>
                             </div>
@@ -1501,7 +1501,7 @@
             } else {
                 badge.className = "hidden sm:flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-800 border border-emerald-200";
                 badge.innerHTML = '<i class="fa-solid fa-house-user mr-1.5"></i> Jharkhand Mode';
-                btnText.innerText = "Unlock Admin (Mumbai)";
+                btnText.innerText = "Unlock Admin";
                 lockIcon.className = "fa-solid fa-lock mr-1.5 text-amber-400";
 
                 lockedNotice.classList.remove('hidden');
