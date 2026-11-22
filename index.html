@@ -1457,7 +1457,7 @@
                 // Lock Admin
                 isAdminUnlocked = false;
                 updateAdminStateUI();
-                showAlert('Admin Locked', 'Logged out of Mumbai Admin Mode.', 'info');
+                showAlert('Admin Locked', 'Logged out of Admin Mode.', 'info');
             } else {
                 openAdminPinModal();
             }
@@ -1477,7 +1477,7 @@
                 isAdminUnlocked = true;
                 closeAdminPinModal();
                 updateAdminStateUI();
-                showAlert('Admin Unlocked', 'Mumbai Admin Mode is active.', 'success');
+                showAlert('Admin Unlocked', 'Admin Mode is active.', 'success');
             } else {
                 showAlert('Security Check', 'Incorrect 4-digit PIN.', 'error');
             }
@@ -1492,7 +1492,7 @@
 
             if (isAdminUnlocked) {
                 badge.className = "hidden sm:flex items-center px-3 py-1 rounded-full text-xs font-bold bg-amber-100 text-amber-900 border border-amber-300";
-                badge.innerHTML = '<i class="fa-solid fa-user-shield mr-1.5 text-amber-600"></i> Mumbai Admin Mode';
+                badge.innerHTML = '<i class="fa-solid fa-user-shield mr-1.5 text-amber-600"></i> Admin Mode';
                 btnText.innerText = "Lock Admin";
                 lockIcon.className = "fa-solid fa-unlock mr-1.5 text-emerald-400";
 
